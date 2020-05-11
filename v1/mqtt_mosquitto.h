@@ -1,4 +1,4 @@
-#include <WiFi.h>
+#include <ESP8266WiFi.h>
 #define MQTT_MAX_PACKET_SIZE 455 //cambialo antes de incluir docpatth\Arduino\libraries\pubsubclient-master\src\pubsubclient.h
 #define MQTT_KEEP_ALIVE 60
 #include <PubSubClient.h> // https://github.com/knolleary/pubsubclient/releases/tag/v2.3

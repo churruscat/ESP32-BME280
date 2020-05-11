@@ -1,12 +1,12 @@
 /**
-  ESP-32E  (ESP32 DEVKIT V1) manejado desde IoT
-  en funcion de la libreria (mqtt_Mosquitto)
+  ESP-12E  (ESP8266) manejado desde IBM IoT
+  en funcion de la libreria (mqtt_Mosquitto o mqtt_Bluemix)
   manda los datos a un servidor mqtt u otro
   Morrastronics -- by chuRRuscat
   v1.0 2017 initial version
   v2.0 2018 mqtt & connectivity  functions separated
   v2.1 2019 anyadido define CON_ LLUVIA y cambios en handleupdate
-  v2.5 2020 reprogrammed. ESP32 instead of ESP8266
+  v2.5 2020 reprogrammed handling of reconnections
 */
 
 #define PRINT_SI
@@ -26,33 +26,27 @@
 //#include "jardin.h"
 #include "terraza.h"
 #include "mqtt_mosquitto.h"  /* mqtt values */
-#undef CON_OTA
-#ifdef CON_OTA
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-#endif
+
 /*************************************************
  ** ----- End of Personalised values ------- **
  * ***********************************************/
 #define AJUSTA_T 10000 // To adjust delay in some places along the program
-#define I2C_SDA 21 
-#define I2C_SCL 22
-#define interruptPin 04 // PIN where I'll connect the rain gauge (GPIO04)
-#define ADC1_CH0 36  // 
-#define ADC1_CH3 39  // 
-#define BME280_ADDR 0x76
-#define interruptPin 04 // PIN where I'll connect the rain gauge-GPIO04
+#define SDA D5   // for BME280 I2C 
+#define SCL D6
+#define interruptPin D7 // PIN where I'll connect the rain gauge
+#define sensorPin    A0  // analog PIN  of Soil humidity sensor
+#define CONTROL_HUMEDAD D2  // Transistor base that switches on&off soil sensor
+#define L_POR_BALANCEO 0.2794 // liter/m2 for evey rain gauge interrupt
 #include <Wire.h>             //libraries for sensors and so on
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <Pin_NodeMCU.h>
 #define PRESSURE_CORRECTION (1.080)  // HPAo/HPHh 647m
-/* beware, I find that the sensors I buy are always alternate 
-#define BME280_ADDRESS   (0x77)   //IMPORTANT, sometimes it is 0x77
-#define BME280_ADDRESS_ALTERNATE (0x76)
-*/
-#define BME280_ADDRESS BME280_ADDRESS_ALTERNATE 
+
+#define BME280_ADDRESS   (0x76)   //IMPORTANT, sometimes it is 0x77
 Adafruit_BME280 sensorBME280;     // this represents the sensor
 
 #define JSONBUFFSIZE 250
@@ -61,15 +55,11 @@ Adafruit_BME280 sensorBME280;     // this represents the sensor
 volatile int contadorPluvi = 0; // must be 'volatile',for counting interrupt 
 /* ********* these are the sensor variables that will be exposed **********/ 
 float temperatura,humedadAire,presionHPa,lluvia=0,sensacion=20;
-#ifdef CON_SUELO
-#define sensorPin    34  // analog PIN  of Soil humidity sensor
-#define CONTROL_HUMEDAD 02  // Transistor base that switches on&off soil sensor
 int humedadMin=HUMEDAD_MIN,
     humedadMax=HUMEDAD_MAX,
     humedadSuelo=0,humedadCrudo=HUMEDAD_MIN;
-int humedadCrudo1,humedadCrudo2;
-#endif
-int    intervaloConex=INTERVALO_CONEX;
+int humedadCrudo1,humedadCrudo2,
+    intervaloConex=INTERVALO_CONEX;
 char datosJson[DATOSJSONSIZE];
 #ifdef CON_LLUVIA
   // Interrupt counter for rain gauge
@@ -91,61 +81,55 @@ boolean status;
      DPRINTLN("Can't connect to BME Sensor!  ");    
    }
    /* start PINs first soil Humidity, then Pluviometer */
-
+   pinMode(CONTROL_HUMEDAD,OUTPUT);
    #ifdef CON_LLUVIA
-    #define L_POR_BALANCEO 0.2794 // liter/m2 for evey rain gauge interrupt
     pinMode(interruptPin, INPUT);
     attachInterrupt(digitalPinToInterrupt(interruptPin), balanceoPluviometro, RISING);
    #endif
-   #ifdef CON_SUELO
-      pinMode(CONTROL_HUMEDAD,OUTPUT);
-     digitalWrite(CONTROL_HUMEDAD, HIGH); // prepare to read soil humidity sensor
-     espera(1000);
-     humedadCrudo1 = analogRead(sensorPin); //first read to have date to get averages
-     espera(1000);
-     humedadCrudo2 = analogRead(sensorPin);  //second read
-     digitalWrite(CONTROL_HUMEDAD, LOW);
-   #endif
+   digitalWrite(CONTROL_HUMEDAD, HIGH); // prepare to read soil humidity sensor
+   espera(1000);
+   humedadCrudo1 = analogRead(sensorPin); //first read to have date to get averages
+   espera(1000);
+   humedadCrudo2 = analogRead(sensorPin);  //second read
+   digitalWrite(CONTROL_HUMEDAD, LOW);
    wifiConnect();
    mqttConnect();
-   #ifdef CON_OTA
-     DPRINTLN(" los dos connect hechos, ahora OTA");
-     ArduinoOTA.setHostname(DEVICE_ID); 
-     ArduinoOTA.onStart([]() {
-        String type;
-        if (ArduinoOTA.getCommand() == U_FLASH) {
-          type = "sketch";
-        } else { // U_FS
-          type = "filesystem";
-        }
-  
-        // NOTE: if updating FS this would be the place to unmount FS using FS.end()
-        DPRINTLN("Start updating " + type);
-     });
-     ArduinoOTA.onEnd([]() {
-        DPRINTLN("\nEnd");
-     });
-     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-     });
-     ArduinoOTA.onError([](ota_error_t error) {
-        #ifdef PRINT_SI
-        Serial.printf("Error[%u]: ", error);
-        #endif
-        if (error == OTA_AUTH_ERROR) {
-          DPRINTLN("Auth Failed");
-        } else if (error == OTA_BEGIN_ERROR) {
-          DPRINTLN("Begin Failed");
-        } else if (error == OTA_CONNECT_ERROR) {
-          DPRINTLN("Connect Failed");
-        } else if (error == OTA_RECEIVE_ERROR) {
-          DPRINTLN("Receive Failed");
-        } else if (error == OTA_END_ERROR) {
-          DPRINTLN("End Failed");
-        }
-     });
-     ArduinoOTA.begin(); 
-   #endif
+   DPRINTLN(" los dos connect hechos, ahora OTA");
+   ArduinoOTA.setHostname(DEVICE_ID); 
+   ArduinoOTA.onStart([]() {
+      String type;
+      if (ArduinoOTA.getCommand() == U_FLASH) {
+        type = "sketch";
+      } else { // U_FS
+        type = "filesystem";
+      }
+
+      // NOTE: if updating FS this would be the place to unmount FS using FS.end()
+      DPRINTLN("Start updating " + type);
+   });
+   ArduinoOTA.onEnd([]() {
+      DPRINTLN("\nEnd");
+   });
+   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+   });
+   ArduinoOTA.onError([](ota_error_t error) {
+      #ifdef PRINT_SI
+      Serial.printf("Error[%u]: ", error);
+      #endif
+      if (error == OTA_AUTH_ERROR) {
+        DPRINTLN("Auth Failed");
+      } else if (error == OTA_BEGIN_ERROR) {
+        DPRINTLN("Begin Failed");
+      } else if (error == OTA_CONNECT_ERROR) {
+        DPRINTLN("Connect Failed");
+      } else if (error == OTA_RECEIVE_ERROR) {
+        DPRINTLN("Receive Failed");
+      } else if (error == OTA_END_ERROR) {
+        DPRINTLN("End Failed");
+      }
+   });
+   ArduinoOTA.begin(); 
    delay(50);
    publicaDatos();      // and publish data. This is the function that gets and sends
 }
@@ -159,9 +143,7 @@ void loop() {
    sinConectividad();        
    mqttConnect();
  }
- #ifdef CON_OTA
-   ArduinoOTA.handle(); 
- #endif
+ ArduinoOTA.handle(); 
  if ((millis()-ultima)>intervaloConex) {   // if it is time to send data, do it
    DPRINT("interval:");DPRINT(intervaloConex);
    DPRINT("\tmillis :");DPRINT(millis());
