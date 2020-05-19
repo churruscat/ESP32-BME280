@@ -256,10 +256,8 @@ boolean tomaDatos (){
     bufPresion1= sensorBME280.readPressure()/100.0F;
     DPRINTLN("Data read");
     #ifdef CON_LLUVIA 
-      //detachInterrupt(digitalPinToInterrupt(interruptPin));
       lluvia+=contadorPluvi*L_POR_BALANCEO;
       contadorPluvi=0;
-      //attachInterrupt(digitalPinToInterrupt(interruptPin), balanceoPluviometro, RISING);
     #endif
     if (humedadMin==humedadMax) humedadMax+=1; 
     /* if data could not be read for whatever reason, raise a message (in PRINT_SI mode) 
@@ -273,12 +271,10 @@ boolean tomaDatos (){
       temperatura=(bufTemp+bufTemp1)/2;
       humedadAire=(bufHumedad+bufHumedad1)/2;
       presionHPa=(bufPresion+bufPresion1)/2*PRESSURE_CORRECTION;
-      escorrecto=true;
-      if (temperatura>60) escorrecto=false;   //if temperature out of reasonable range
-      if ((humedadAire>101)||(humedadAire<0)) escorrecto=false;    // or humidity      
+      escorrecto=true;  
     } 
     if (i++>30) {
-      return escorrecto;
+      return false;
     }  
     espera(1000);
   }
