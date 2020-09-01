@@ -136,7 +136,7 @@ void handleUpdate(byte* payload) {
 
 boolean enviaDatos(char * topic, char * datosJSON) {
   int k=0;
-  boolean pubresult=true;  
+  boolean pubresult=false;  
   
  while (!clienteMQTT.loop() & k<20 ) {
     DPRINTLN("Device was disconnected, reconnecting ");   
