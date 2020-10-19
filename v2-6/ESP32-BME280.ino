@@ -298,8 +298,8 @@ boolean tomaDatos (){
       humedadAire=(bufHumedad+bufHumedad1)/2;
       presionHPa=(bufPresion+bufPresion1)/2*PRESSURE_CORRECTION;
       valores["temp"]=temperatura;      
-      valores["HPa"]=(int)presionHPa;      
-      valores["hAire"]=(int)humedadAire;
+      valores["HPa"]=presionHPa;      
+      valores["hAire"]=humedadAire;
       escorrecto=true;  
     } 
     if (i++>30) {
