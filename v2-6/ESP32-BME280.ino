@@ -65,6 +65,7 @@ Adafruit_BME280 sensorBME280;     // this represents the sensor
 #define DATOSJSONSIZE 250
 
 volatile int contadorPluvi = 0; // must be 'volatile',for counting interrupt 
+volatile long lastTrigger=0;
 /* ********* these are the sensor variables that will be exposed **********/ 
 float temperatura,humedadAire,presionHPa,lluvia=0,sensacion=20;
 #ifdef CON_SUELO
@@ -81,7 +82,10 @@ int humedadCrudo1,humedadCrudo2;
 #ifdef CON_LLUVIA
   // Interrupt counter for rain gauge
   void ICACHE_RAM_ATTR balanceoPluviometro() {  
-  contadorPluvi++;
+    if ((millis()-lastTrigger) > 1000){
+       lastTrigger=millis();
+         contadorPluvi++;
+    }
 }
 #endif
 int  intervaloConex=INTERVALO_CONEX;
@@ -298,8 +302,8 @@ boolean tomaDatos (){
       humedadAire=(bufHumedad+bufHumedad1)/2;
       presionHPa=(bufPresion+bufPresion1)/2*PRESSURE_CORRECTION;
       valores["temp"]=temperatura;      
-      valores["HPa"]=presionHPa;      
-      valores["hAire"]=humedadAire;
+      valores["HPa"]=(int)presionHPa;      
+      valores["hAire"]=(int)humedadAire;
       escorrecto=true;  
     } 
     if (i++>30) {

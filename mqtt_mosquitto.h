@@ -1,13 +1,15 @@
-#include <WiFi.h>
-#define MQTT_MAX_PACKET_SIZE 455 //cambialo antes de incluir docpatth\Arduino\libraries\pubsubclient-master\src\pubsubclient.h
+#include <ESP8266WiFi.h>
+#define MQTT_MAX_PACKET_SIZE 455 //must be before docpatth\Arduino\libraries\pubsubclient-master\src\pubsubclient.h
+//setBufferSize(455); introduced in version 2.8
 #define MQTT_KEEP_ALIVE 60
-#include <PubSubClient.h> // https://github.com/knolleary/pubsubclient/releases/tag/v2.3
-#include <Pin_NodeMCU.h>
+#include <PubSubClient.h> // https://github.com/knolleary/pubsubclient
+#include "Pin_NodeMCU.h"
 
 /*************************************************
- ** -------- Valores Personalizados ----------- **
+ ** ---------- Personalized Values ------------- **
  * ***********************************************/
-#define DEVICE_TYPE "ESP32E-Riego"
+#define ESPERA_NOCONEX 30000  // When no conection, wait 30 sec
+#define DEVICE_TYPE "ESP12E-Meteo"
 char* ssid;
 char* password;
 /*********** personal.h should include SSID and passwords  ***********
@@ -22,8 +24,6 @@ char password2[] = "Password_ssid2";
 /*************************************************
  ** ----- Fin de Valores Personalizados ------- **
  * ***********************************************/
-#define ESPERA_NOCONEX 30000  // When no conection, wait 30 sec
-char server[] = "192.168.1.11";
 char * authMethod = NULL;
 char * token = NULL;
 char clientId[] = "d:" LOCATION":" DEVICE_TYPE ":" DEVICE_ID;

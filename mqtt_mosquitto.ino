@@ -14,10 +14,15 @@ int i=0,j=0;
  
   // if (WiFi.status() == WL_CONNECTED ) return true;  // if already connected
   DPRINT("Connecting to WiFi  "); DPRINTLN(ssid); 
+  WiFi.persistent(false); 
   WiFi.mode(WIFI_OFF);
   delay(1000);
+  //WiFi.setPhyMode(WIFI_PHY_MODE_11B);  
   WiFi.mode(WIFI_STA);  //The 8266 is a station, not an AP 
-  delay(1000);
+  #ifdef IP_FIJA
+    WiFi.config(ip, gateway, subnet);
+  #endif
+  delay(1000); 
   WiFi.begin(ssid,password);
 
   while ((WiFi.status() != WL_CONNECTED )) {
@@ -40,7 +45,11 @@ int i=0,j=0;
       DPRINT("I will try to connect to "); DPRINTLN(ssid);
       WiFi.mode(WIFI_OFF);
       delay(1000);
+      // WiFi.setPhyMode(WIFI_PHY_MODE_11B);  // gives more stability
       WiFi.mode(WIFI_STA);  //The 8266 is a station, not an AP 
+      #ifdef IP_FIJA
+        WiFi.config(ip, gateway, subnet);
+      #endif      
       espera(1000);
       WiFi.begin(ssid,password);      
     }
@@ -59,8 +68,9 @@ int j=0;
   clienteMQTT.disconnect(); 
   espera(500);
   while(!wifiConnect()) {   
-    DPRINT("Sin conectividad, espero secs  ");DPRINTLN(int(intervaloConex/2000));
-    espera(ESPERA_NOCONEX);
+    DPRINT("No connectivity, wait secs  ");
+    DPRINTLN(int(intervaloConex/1000));
+    espera(intervaloConex);
   }
 }
 
@@ -72,17 +82,18 @@ void mqttConnect() {
  int j=0;
  
   if ((WiFi.status() == WL_CONNECTED )) {
-   while (!clienteMQTT.connect(clientId, authMethod, token)) {
-     if (WiFi.status() != WL_CONNECTED ) sinConectividad();      
-     DPRINT(j);DPRINTLN("  Retry connection to MQTT  ");
-     j++;
-     espera(2000);
-     if (j>20) {
+     while (!clienteMQTT.connect(clientId, authMethod, token) && j<20) {
+       if (WiFi.status() != WL_CONNECTED ) sinConectividad();      
+       DPRINT(j);DPRINTLN("  Retry connection to MQTT  ");
+       j++;
+       espera(2000);
+  /*     if (j>20) {
        sinConectividad();  
        j=0;
       }
+*/      
      }
-   } else {
+  } else {
     sinConectividad();   
   }
   initManagedDevice(); 
@@ -100,6 +111,7 @@ boolean loopMQTT() {
 void initManagedDevice() {
  int rReboot,rUpdate,rResponse; 
 
+ clienteMQTT.setBufferSize(455);
  rReboot=  clienteMQTT.subscribe(rebootTopic,1);
  rUpdate=  clienteMQTT.subscribe(updateTopic,1);
  rResponse=clienteMQTT.subscribe(responseTopic,1);
@@ -109,7 +121,7 @@ void initManagedDevice() {
 }
 
 void funcallback(char* topic, byte* payload, unsigned int payloadLength) {
- DPRINT("funcallback invocado para el topic: "); DPRINTLN(topic);
+ DPRINT("funcallback invoked for topic: "); DPRINTLN(topic);
  if (strcmp (updateTopic, topic) == 0) {
    handleUpdate(payload);  
  }
@@ -119,8 +131,7 @@ void funcallback(char* topic, byte* payload, unsigned int payloadLength) {
  } 
  else if (strcmp (rebootTopic, topic) == 0) {
    DPRINTLN("Rearrancando...");    
-   ESP.restart(); // da problemas, no siempre rearranca
-   //ESP.reset();
+   ESP.restart(); // this has issues, sometimes hangs
  }
 }
 
@@ -134,17 +145,18 @@ void handleUpdate(byte* payload) {
 
 /********** Send data to broker **************/
 
-boolean enviaDatos(char * topic, char * datosJSON) {
+boolean enviaDatos(char * topic, char * datos) {
   int k=0;
-  boolean pubresult=true;  
+  boolean pubresult=false;  
   
- while (!clienteMQTT.loop() & k<20 ) {
+ while (!clienteMQTT.loop() && k<12 ) {
     DPRINTLN("Device was disconnected, reconnecting ");   
     mqttConnect();
     initManagedDevice();
+    espera(5000);
     k++; 
   }
-  pubresult = clienteMQTT.publish(topic,datosJSON);
+  pubresult = clienteMQTT.publish(topic,datos);
   DPRINT("Sending ");DPRINT(datosJson);
   DPRINT("to ");DPRINTLN(publishTopic);
   if (pubresult) 
@@ -160,6 +172,7 @@ void espera(unsigned long tEspera) {
   
   while ((millis()-principio)<tEspera) {
     yield();
-    delay(50);
+    ArduinoOTA.handle();
+    delay(100);
   }
 }
