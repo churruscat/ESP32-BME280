@@ -28,4 +28,4 @@
 
 #define HUMEDAD_MIN  100  // valores de A0 para suelo seco y empapado
 #define HUMEDAD_MAX  600
-#define INTERVALO_CONEX 58000 // 5 min en milisecs
+#define INTERVALO_CONEX 58000 // 1 min en milisecs

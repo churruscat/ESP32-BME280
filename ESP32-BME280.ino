@@ -9,7 +9,8 @@
           added #define BME280 to diferentiate BMP280 and BME280 in <device.h>
     v3.0 2021 Integrate ESP12 and ESP32, use #define ESP32      
 */
-#define ESP32  // to use an ESP32 or (if undefined) an ESP12
+#undef  ESP32
+//#define ESP32  // to use an ESP32 or (if undefined) an ESP12
 
 #define PRINT_SI
 #ifdef  PRINT_SI
@@ -44,7 +45,7 @@
   #include <ESP8266mDNS.h>
   #include <WiFiUdp.h>
   #include <ArduinoOTA.h>
-  define SDA D5   // for BME280 I2C 
+  #define SDA D5   // for BME280 I2C 
   #define SCL D6
   #define interruptPin D7 // PIN where I'll connect the rain gauge
   #define PIN_UV D8
