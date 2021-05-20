@@ -49,7 +49,7 @@
   #define SCL D6
   #define interruptPin D7 // PIN where I'll connect the rain gauge
   #define PIN_UV D8
-  #define sensorPin    A0  // analog PIN  of Soil humidity sensor
+  #define hSueloPin    A0  // analog PIN  of Soil humidity sensor
   #define CONTROL_HUMEDAD D2  // Transistor base that switches on&off soil sensor
 #endif
 #ifdef IS_BME280
@@ -129,9 +129,9 @@ boolean status;
     pinMode(CONTROL_HUMEDAD,OUTPUT);
     digitalWrite(CONTROL_HUMEDAD, HIGH); // prepare to read soil humidity sensor
     espera(1000);
-    humedadCrudo1 = analogRead(sensorPin); //first read to have date to get averages
+    humedadCrudo1 = analogRead(hSueloPin); //first read to have date to get averages
     espera(1000);
-    humedadCrudo2 = analogRead(sensorPin);  //second read
+    humedadCrudo2 = analogRead(hSueloPin);  //second read
     digitalWrite(CONTROL_HUMEDAD, LOW);
   #endif
   wifiConnect();
@@ -262,7 +262,7 @@ boolean tomaDatos (){
         /* activate soil sensor setting the transistor base */
         digitalWrite(CONTROL_HUMEDAD, HIGH);
         espera(1000);  
-        humedadCrudo = analogRead(sensorPin); // and read soil moisture
+        humedadCrudo = analogRead(hSueloPin); // and read soil moisture
         humedadCrudo=constrain(humedadCrudo,humedadMin,humedadMax); 
         digitalWrite(CONTROL_HUMEDAD, LOW);  // disconnect soil sensor
         // calculate the moving average of soil humidity of last three values 
